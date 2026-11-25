@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 # Publish the .debs in bin/deb: as a GitHub release of the tag, and into
-# the signed apt repository served by dl.kalopa.com. Called by
+# the signed apt repository served by download.kalopa.com. Called by
 # `make publish`:
 #   publish.sh <tag> <signing-key>
 # with KUBE_CONTEXT, KUBE_NS, KUBE_TARGET and DPKG_DIR in the environment:

@@ -21,15 +21,15 @@ On Raspberry Pi OS or Ubuntu, add the Kalopa Robotics apt repository
 and install, in one go:
 
 ```sh
-curl -fsSL https://dl.kalopa.com/dpkg/setup.sh | sudo sh
+curl -fsSL https://download.kalopa.com/dpkg/setup.sh | sudo sh
 ```
 
 or by hand, which is all that script does:
 
 ```sh
 sudo install -d -m 0755 /etc/apt/keyrings
-sudo curl -fsSL https://dl.kalopa.com/dpkg/kalopa.gpg -o /etc/apt/keyrings/kalopa.gpg
-echo "deb [signed-by=/etc/apt/keyrings/kalopa.gpg] https://dl.kalopa.com/dpkg stable main" | \
+sudo curl -fsSL https://download.kalopa.com/dpkg/kalopa.gpg -o /etc/apt/keyrings/kalopa.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kalopa.gpg] https://download.kalopa.com/dpkg stable main" | \
     sudo tee /etc/apt/sources.list.d/kalopa.list
 sudo apt update && sudo apt install foudra-printman
 ```
