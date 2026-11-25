@@ -60,6 +60,54 @@ install: build-pi ## Build for the Pi, install on $(PI_HOST) and restart the dae
 		rm /tmp/$(BINARY) && sudo systemctl restart $(BINARY) && systemctl --no-pager status $(BINARY) | \
 		head -5'
 
+# Debian packages. The version comes from the latest vX.Y.Z tag
+# (1.2.0, or 1.2.0+3.gabc1234 three commits on); with no tag yet it is
+# 0.0~git<date>.<commit>, which sorts before any release.
+DEB_ARCHES  ?= arm64 armhf amd64
+DEB_VERSION ?= $(or $(shell git describe --tags --match 'v[0-9]*' 2>/dev/null | sed -E 's/^v//; s/-([0-9]+)-g/+\1.g/'),0.0~git$(shell date -u +%Y%m%d).$(COMMIT))
+MAINTAINER  ?= Kalopa Robotics Limited <info@kalopa.com>
+
+# Publishing: the key that signs the apt repository (gpg picks its
+# signing subkey), and where https://dl.kalopa.com/dpkg is served from:
+# DPKG_DIR inside the download deployment, reached with kubectl.
+SIGNING_KEY  ?= info@kalopa.com
+KUBE_CONTEXT ?= ext07
+KUBE_NS      ?= kalopa
+KUBE_TARGET  ?= deploy/download
+DPKG_DIR     ?= /data/dpkg
+export KUBE_CONTEXT KUBE_NS KUBE_TARGET DPKG_DIR
+
+.PHONY: deb
+deb: ## Build .deb packages for $(DEB_ARCHES) into ./bin/deb
+	@mkdir -p bin/deb && rm -f bin/deb/*.deb bin/deb/SHA256SUMS
+	@for a in $(DEB_ARCHES); do \
+		case $$a in \
+		arm64) env="GOARCH=arm64" ;; \
+		armhf) env="GOARCH=arm GOARM=6" ;; \
+		amd64) env="GOARCH=amd64" ;; \
+		*) echo "unknown arch $$a" >&2; exit 1 ;; \
+		esac; \
+		env CGO_ENABLED=0 GOOS=linux $$env go build -trimpath -ldflags "$(LDFLAGS) -X main.version=$(DEB_VERSION)" \
+			-o bin/deb/$(BINARY)-$$a ./cmd/$(BINARY) || exit 1; \
+		packaging/deb/build.sh $$a "$(DEB_VERSION)" "$(MAINTAINER)" bin/deb/$(BINARY)-$$a bin/deb || exit 1; \
+		rm bin/deb/$(BINARY)-$$a; \
+	done
+
+# Only a clean checkout of a pushed vX.Y.Z tag is published.
+.PHONY: publish
+publish: ## Release the current tag: GitHub release, plus the apt repository on dl.kalopa.com
+	@test -z "$$(git status --porcelain)" || { echo 'publish: the working tree is not clean' >&2; exit 1; }
+	@tag=$$(git describe --tags --exact-match --match 'v[0-9]*' 2>/dev/null) || \
+		{ echo 'publish: HEAD is not a vX.Y.Z tag' >&2; exit 1; }; \
+	git ls-remote --exit-code --tags origin "$$tag" >/dev/null || \
+		{ echo "publish: push the tag first: git push origin $$tag" >&2; exit 1; }; \
+	$(MAKE) check-tests deb && packaging/apt/publish.sh "$$tag" "$(SIGNING_KEY)"
+
+.PHONY: check-tests
+check-tests: ## Vet and test without reformatting (what CI and publish run)
+	go vet ./...
+	go test -race -count=1 ./...
+
 .PHONY: test
 test: ## Run the test suite
 	go test -race -count=1 ./...

@@ -1,0 +1,15 @@
+Package: foudra-printman
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: @MAINTAINER@
+Installed-Size: @SIZE@
+Section: misc
+Priority: optional
+Homepage: https://github.com/kalopa/foudra_printman
+Description: Foudra print manager: drives a 3D-printer farm for the Foudra MRP
+ A daemon that drives 3D printers (Prusa printers over PrusaLink, Bambu
+ Lab printers in Developer Mode, and anything behind OctoPrint) and keeps
+ the Foudra MRP up to date with what they made and what they used.
+ .
+ Configure it in /etc/print-manager/env; the service starts once
+ MRP_URL and MRP_API_KEY are set there.

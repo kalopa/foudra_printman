@@ -1,0 +1,16 @@
+# Foudra Print Manager configuration. Root-only (0600): it holds keys.
+# The service does not start until MRP_URL and MRP_API_KEY are set.
+# After editing:  sudo systemctl restart print-manager
+#
+# Your Foudra site, and an API key made under its "API keys" page.
+MRP_URL=
+MRP_API_KEY=
+#
+# One key per printer, named by its workstation code upper-cased with
+# other characters as _. PrusaLink: the API key. OctoPrint: an
+# application key. Bambu Lab: the access code from the printer's screen.
+#PRINTER_KEY_CORE_ONEP_1=
+#
+# Optional.
+#GCODE_DIR=/var/lib/print-manager/gcode
+#POLL_INTERVAL=15s

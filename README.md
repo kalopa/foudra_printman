@@ -15,7 +15,50 @@ the Foudra API over the Internet, and your printer(s).
 One daemon drives the whole farm, each printer in a goroutine of its
 own, so a slow upload to one never holds up the others.
 
-## Installing on a Pi
+## Installing from a package
+
+On Raspberry Pi OS or Ubuntu, add the Kalopa Robotics apt repository
+and install, in one go:
+
+```sh
+curl -fsSL https://dl.kalopa.com/dpkg/setup.sh | sudo sh
+```
+
+or by hand, which is all that script does:
+
+```sh
+sudo install -d -m 0755 /etc/apt/keyrings
+sudo curl -fsSL https://dl.kalopa.com/dpkg/kalopa.gpg -o /etc/apt/keyrings/kalopa.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kalopa.gpg] https://dl.kalopa.com/dpkg stable main" | \
+    sudo tee /etc/apt/sources.list.d/kalopa.list
+sudo apt update && sudo apt install foudra-printman
+```
+
+Upgrades then come with `apt upgrade`. Each GitHub
+[release](https://github.com/kalopa/foudra_printman/releases) also has
+the `.deb` files, for `sudo apt install ./foudra-printman_<version>_arm64.deb`:
+`arm64` for 64-bit Pi OS and Ubuntu on a Pi, `armhf` for 32-bit Pi OS
+(any Pi), `amd64` for a PC. Then:
+
+```sh
+sudoedit /etc/print-manager/env        # MRP_URL, MRP_API_KEY, PRINTER_KEY_…
+sudo systemctl start print-manager && journalctl -fu print-manager
+```
+
+The service is enabled on install but does not start until the env file
+has an API key. An upgrade keeps your env file and restarts the service.
+Removing the package leaves `/var/lib/print-manager` (your G-code) and
+the `print-manager` user in place.
+
+`make deb` builds the same packages locally into `bin/deb`. A release is
+`git tag vX.Y.Z && git push origin vX.Y.Z`, then, on the machine that
+holds the signing key, `make publish`: it tests, builds, creates the
+GitHub release, and adds the packages to the signed apt repository
+(`packaging/apt/`), which it copies with `kubectl` into `/data/dpkg` of
+the dl.kalopa.com deployment (`KUBE_CONTEXT`, `KUBE_NS`, `KUBE_TARGET`
+and `DPKG_DIR` in the Makefile say where).
+
+## Installing on a Pi by hand
 
 First you'll need an API key on Foudra. Get one here:
 https://yourcompany.foudra.com/api-keys.

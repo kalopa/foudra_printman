@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+
+# The print-manager user and /var/lib/print-manager (which holds your
+# G-code) are left in place, even on purge.
+if [ -d /run/systemd/system ]; then
+	systemctl daemon-reload || true
+fi

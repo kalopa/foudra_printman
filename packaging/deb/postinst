@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = configure ]; then
+	if ! getent passwd print-manager >/dev/null; then
+		useradd --system --user-group --home-dir /var/lib/print-manager \
+			--no-create-home --shell /usr/sbin/nologin print-manager
+	fi
+	mkdir -p /var/lib/print-manager/gcode
+	chown print-manager:print-manager /var/lib/print-manager /var/lib/print-manager/gcode
+	chmod 0600 /etc/print-manager/env
+
+	if [ -d /run/systemd/system ]; then
+		systemctl daemon-reload
+		systemctl enable print-manager.service >/dev/null 2>&1 || true
+		if grep -q '^MRP_API_KEY=.' /etc/print-manager/env; then
+			systemctl restart print-manager.service || true
+		else
+			echo "foudra-printman: set MRP_URL and MRP_API_KEY in /etc/print-manager/env,"
+			echo "then: sudo systemctl start print-manager"
+		fi
+	fi
+fi
