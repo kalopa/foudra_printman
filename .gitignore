@@ -2,6 +2,9 @@
 # Any keys left lying around
 /KEYS
 #
+# Site settings for `make publish`
+/local.mk
+#
 # Local build directories
 /config
 /dev

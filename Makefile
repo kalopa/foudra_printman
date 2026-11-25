@@ -67,14 +67,14 @@ DEB_ARCHES  ?= arm64 armhf amd64
 DEB_VERSION ?= $(or $(shell git describe --tags --match 'v[0-9]*' 2>/dev/null | sed -E 's/^v//; s/-([0-9]+)-g/+\1.g/'),0.0~git$(shell date -u +%Y%m%d).$(COMMIT))
 MAINTAINER  ?= Kalopa Robotics Limited <info@kalopa.com>
 
-# Publishing: the key that signs the apt repository (gpg picks its
-# signing subkey), and where https://dl.kalopa.com/dpkg is served from:
-# DPKG_DIR inside the download deployment, reached with kubectl.
-SIGNING_KEY  ?= info@kalopa.com
-KUBE_CONTEXT ?= ext07
-KUBE_NS      ?= kalopa
-KUBE_TARGET  ?= deploy/download
-DPKG_DIR     ?= /data/dpkg
+# Publishing is configured per site, in local.mk (not in git):
+#   SIGNING_KEY  = the gpg key that signs the apt repository
+#   KUBE_CONTEXT = kubectl context of the cluster serving the repository
+#   KUBE_NS      = its namespace
+#   KUBE_TARGET  = the workload to exec into, e.g. deploy/download
+#   DPKG_DIR     = the repository's directory inside it
+-include local.mk
+PUBLISH_VARS := SIGNING_KEY KUBE_CONTEXT KUBE_NS KUBE_TARGET DPKG_DIR
 export KUBE_CONTEXT KUBE_NS KUBE_TARGET DPKG_DIR
 
 .PHONY: deb
@@ -95,7 +95,8 @@ deb: ## Build .deb packages for $(DEB_ARCHES) into ./bin/deb
 
 # Only a clean checkout of a pushed vX.Y.Z tag is published.
 .PHONY: publish
-publish: ## Release the current tag: GitHub release, plus the apt repository on dl.kalopa.com
+publish: ## Release the current tag: GitHub release, plus the apt repository (see local.mk)
+	$(foreach v,$(PUBLISH_VARS),$(if $($(v)),,$(error publish: set $(v) in local.mk (see the Makefile))))
 	@test -z "$$(git status --porcelain)" || { echo 'publish: the working tree is not clean' >&2; exit 1; }
 	@tag=$$(git describe --tags --exact-match --match 'v[0-9]*' 2>/dev/null) || \
 		{ echo 'publish: HEAD is not a vX.Y.Z tag' >&2; exit 1; }; \

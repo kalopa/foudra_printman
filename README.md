@@ -34,6 +34,14 @@ echo "deb [signed-by=/etc/apt/keyrings/kalopa.gpg] https://dl.kalopa.com/dpkg st
 sudo apt update && sudo apt install foudra-printman
 ```
 
+The packages are signed by the Kalopa Robotics key. To check the one
+you fetched, `gpg --show-keys /etc/apt/keyrings/kalopa.gpg` should show
+this fingerprint:
+
+```
+5986 06F5 883C 7DEF E61C  857B E7D3 4F4E 6826 0392
+```
+
 Upgrades then come with `apt upgrade`. Each GitHub
 [release](https://github.com/kalopa/foudra_printman/releases) also has
 the `.deb` files, for `sudo apt install ./foudra-printman_<version>_arm64.deb`:
@@ -54,9 +62,10 @@ the `print-manager` user in place.
 `git tag vX.Y.Z && git push origin vX.Y.Z`, then, on the machine that
 holds the signing key, `make publish`: it tests, builds, creates the
 GitHub release, and adds the packages to the signed apt repository
-(`packaging/apt/`), which it copies with `kubectl` into `/data/dpkg` of
-the dl.kalopa.com deployment (`KUBE_CONTEXT`, `KUBE_NS`, `KUBE_TARGET`
-and `DPKG_DIR` in the Makefile say where).
+(`packaging/apt/`), which it copies with `kubectl` into the web server
+that serves it. Where that is, and which key signs, are set in a
+`local.mk` beside the Makefile, kept out of git; the Makefile lists the
+variables.
 
 ## Installing on a Pi by hand
 
