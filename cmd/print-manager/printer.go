@@ -22,6 +22,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/kalopa/print_manager/internal/bambu"
 	"github.com/kalopa/print_manager/internal/prusalink"
 )
 
@@ -31,10 +32,12 @@ import (
 // thing that should change a printer's state, and it does not exist yet.
 func printerCmd(args []string) error {
 	fs := flag.NewFlagSet("printer", flag.ContinueOnError)
+	driver := fs.String("driver", "prusalink", "prusalink or bambu")
 	urlFlag := fs.String("url", os.Getenv("PRUSALINK_URL"), "printer address, e.g. http://192.168.1.7 (or $PRUSALINK_URL)")
-	keyEnv := fs.String("key-env", "PRUSALINK_KEY", "environment variable holding the API key")
+	keyEnv := fs.String("key-env", "PRUSALINK_KEY", "environment variable holding the API key (bambu: the access code)")
+	serial := fs.String("serial", "", "bambu: the printer's serial number")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: print-manager printer [-url http://host] [-key-env VAR] status|info")
+		fmt.Fprintln(os.Stderr, "usage: print-manager printer [-driver prusalink|bambu] [-url host] [-key-env VAR] [-serial SN] status|info")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -48,12 +51,19 @@ func printerCmd(args []string) error {
 	if key == "" {
 		return fmt.Errorf("printer: $%s is not set", *keyEnv)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	switch *driver {
+	case "prusalink":
+	case "bambu":
+		return bambuStatus(ctx, *urlFlag, *serial, key)
+	default:
+		return fmt.Errorf("printer: no read-only look for driver %q", *driver)
+	}
 	c, err := prusalink.New(*urlFlag, key)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
 
 	switch fs.Arg(0) {
 	case "info":
@@ -94,6 +104,37 @@ func printerCmd(args []string) error {
 		fs.Usage()
 		return fmt.Errorf("printer: unknown action %q", fs.Arg(0))
 	}
+}
+
+// bambuStatus is status and info in one for a Bambu printer: it says
+// everything in one report. Connecting proves the access code and LAN
+// mode; it does not prove Developer Mode, which only starting a print
+// would, and this command never starts one.
+func bambuStatus(ctx context.Context, addr, serial, code string) error {
+	c, err := bambu.New(addr, serial, code, bambu.Options{})
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+	r, err := c.Report(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("state %s  nozzle %.0f/%.0f °C  bed %.0f/%.0f °C  wifi %s\n",
+		r.GCodeState, r.Nozzle, r.NozzleTarget, r.Bed, r.BedTarget, r.WifiSignal)
+	if r.PrintError != 0 {
+		fmt.Printf("print_error %08X\n", r.PrintError)
+	}
+	for _, h := range r.HMS {
+		fmt.Printf("hms %08X_%08X\n", h.Attr, h.Code)
+	}
+	if r.GCodeState == bambu.StateIdle || r.SubtaskName == "" {
+		fmt.Println("no job")
+		return nil
+	}
+	fmt.Printf("job %s\n  %d%%  layer %d/%d  remaining %s\n",
+		r.SubtaskName, r.Percent, r.LayerNum, r.TotalLayers, hms(r.RemainingMin*60))
+	return nil
 }
 
 func hms(seconds int) string {

@@ -287,7 +287,9 @@ func TestDiscoverChoosesTheDriver(t *testing.T) {
 	}{
 		{"existing prusalink station, old key name", `{"prusalink_url":"http://192.0.2.7"}`, "PRUSALINK_KEY_CORE_ONEP_1", "prusalink.Driver"},
 		{"octoprint", `{"driver":"octoprint","url":"http://192.0.2.8"}`, "PRINTER_KEY_CORE_ONEP_1", "octoprint.Driver"},
-		{"unknown driver", `{"driver":"bambu","url":"http://192.0.2.9"}`, "PRINTER_KEY_CORE_ONEP_1", ""},
+		{"bambu", `{"driver":"bambu","url":"192.0.2.9","serial":"01P00A000000001","bambu":{"use_ams":true}}`, "PRINTER_KEY_CORE_ONEP_1", "bambu.Driver"},
+		{"bambu without serial", `{"driver":"bambu","url":"192.0.2.9"}`, "PRINTER_KEY_CORE_ONEP_1", ""},
+		{"unknown driver", `{"driver":"klipper","url":"http://192.0.2.9"}`, "PRINTER_KEY_CORE_ONEP_1", ""},
 		{"no key", `{"driver":"octoprint","url":"http://192.0.2.8"}`, "", ""},
 		{"no address", `{"driver":"octoprint"}`, "PRINTER_KEY_CORE_ONEP_1", ""},
 	} {
@@ -312,6 +314,20 @@ func TestDiscoverChoosesTheDriver(t *testing.T) {
 				t.Errorf("driver = %q, want %q", got, tc.wantKind)
 			}
 		})
+	}
+}
+
+func TestSidecarPath(t *testing.T) {
+	for in, want := range map[string]string{
+		"/g/case.bgcode":         "/g/case.json",
+		"/g/case.gcode":          "/g/case.json",
+		"/g/case_x4.gcode.3mf":   "/g/case_x4.json",
+		"/g/plate.3mf":           "/g/plate.json",
+		"https://h/g/rib.bgcode": "https://h/g/rib.json",
+	} {
+		if got := sidecarPath(in); got != want {
+			t.Errorf("sidecarPath(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 

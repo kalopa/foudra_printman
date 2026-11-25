@@ -49,6 +49,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kalopa/print_manager/internal/bambu"
 	"github.com/kalopa/print_manager/internal/mrp"
 	"github.com/kalopa/print_manager/internal/octoprint"
 	"github.com/kalopa/print_manager/internal/printer"
@@ -69,15 +70,19 @@ const autoTag = "[auto] "
 // code: PRUSALINK_KEY_<CODE>.
 type Settings struct {
 	// Driver is the protocol the printer speaks: prusalink (the default,
-	// so stations configured before there was a choice need no change)
-	// or octoprint.
+	// so stations configured before there was a choice need no change),
+	// octoprint, or bambu.
 	Driver string `json:"driver,omitempty"`
 	// URL is the printer's address for any driver. PrusaLinkURL is the
 	// older name, still read for prusalink stations; see Address.
 	URL          string `json:"url,omitempty"`
 	PrusaLinkURL string `json:"prusalink_url,omitempty"`
 	Profile      string `json:"profile"`
-	Window       struct {
+	// Serial is a Bambu printer's serial number, which names its MQTT
+	// topics; Bambu holds its job options. Neither is used by the others.
+	Serial string         `json:"serial,omitempty"`
+	Bambu  *bambu.Options `json:"bambu,omitempty"`
+	Window struct {
 		Start              string `json:"start"`
 		End                string `json:"end"`
 		Timezone           string `json:"timezone"`
@@ -232,6 +237,18 @@ func Discover(ctx context.Context, m mrpAPI, log *slog.Logger) ([]*Printer, erro
 				continue
 			}
 			link = octoprint.Driver{C: c}
+		case "bambu":
+			// The key is the access code from the printer's screen.
+			var opts bambu.Options
+			if st.Bambu != nil {
+				opts = *st.Bambu
+			}
+			c, err := bambu.New(st.Address(), st.Serial, key, opts)
+			if err != nil {
+				log.Warn("bad bambu settings; skipping", "workstation", ws.Code, "err", err)
+				continue
+			}
+			link = bambu.Driver{C: c}
 		default:
 			log.Warn("unknown printer driver; skipping", "workstation", ws.Code, "driver", st.Driver)
 			continue
@@ -845,7 +862,7 @@ func (f *Farm) resolveGCode(name string) (string, Sidecar, error) {
 			if err := fetch(name, local); err != nil {
 				return "", side, err
 			}
-			_ = fetch(strings.TrimSuffix(name, ".bgcode")+".json", strings.TrimSuffix(local, ".bgcode")+".json") // best effort
+			_ = fetch(sidecarPath(name), sidecarPath(local)) // best effort
 		}
 		path = local
 	case filepath.IsAbs(name):
@@ -856,10 +873,22 @@ func (f *Farm) resolveGCode(name string) (string, Sidecar, error) {
 	if _, err := os.Stat(path); err != nil {
 		return "", side, err
 	}
-	if b, err := os.ReadFile(strings.TrimSuffix(path, filepath.Ext(path)) + ".json"); err == nil {
+	if b, err := os.ReadFile(sidecarPath(path)); err == nil {
 		_ = json.Unmarshal(b, &side)
 	}
 	return path, side, nil
+}
+
+// sidecarPath is where a sliced file's sidecar is: beside it, with the
+// slicer's extension (.bgcode, .gcode, or .gcode.3mf as one) swapped
+// for .json.
+func sidecarPath(p string) string {
+	for _, ext := range []string{".gcode.3mf", ".3mf", ".bgcode", ".gcode"} {
+		if strings.HasSuffix(p, ext) {
+			return strings.TrimSuffix(p, ext) + ".json"
+		}
+	}
+	return strings.TrimSuffix(p, filepath.Ext(p)) + ".json"
 }
 
 func fetch(url, dest string) error {

@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Command print-manager drives Prusa printers through PrusaLink and
-// reports to the Foudra MRP. This file is subcommand dispatch and
+// Command print-manager drives 3D printers (PrusaLink, OctoPrint, Bambu
+// Lab in Developer Mode) and reports to the Foudra MRP. This file is subcommand dispatch and
 // process lifecycle only; the logic lives in internal/.
 package main
 
@@ -70,7 +70,7 @@ func usage() {
 
   serve      Run the daemon: discover printers from the MRP and keep it honest
   printers   List the printers the daemon would drive (read-only)
-  printer    Read-only look at one printer: printer [-url U] [-key-env VAR] status|info
+  printer    Read-only look at one printer: printer [-driver D] [-url U] [-key-env VAR] [-serial SN] status|info
   version    Print build metadata
   help       This text
 `)

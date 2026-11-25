@@ -5,8 +5,9 @@
 orders and work orders to build what you want, when you want it.
 It has an extensive API for adding third-party integrations, like this.
 
-A daemon that drives 3D printers — Prusa printers over PrusaLink, and
-anything behind OctoPrint — and keeps the Foudra MRP honest about what
+A daemon that drives 3D printers — Prusa printers over PrusaLink,
+Bambu Lab printers in Developer Mode, and anything behind OctoPrint —
+and keeps the Foudra MRP honest about what
 they made and what they ate. Runs on a Raspberry Pi beside the printers.
 Well, it runs on whatever hardware you have lying around that can access
 the Foudra API over the Internet, and your printer(s).
@@ -79,6 +80,13 @@ A printer behind OctoPrint:
  "window": {"start": "08:00", "end": "22:00", "timezone": "Europe/Dublin", "must_finish_in_window": true}}
 ```
 
+A Bambu Lab printer:
+
+```json
+{"driver": "bambu", "url": "192.168.1.120", "serial": "01P00A000000001", "profile": "p2s-0.4",
+ "bambu": {"use_ams": true, "ams_mapping": [0]}}
+```
+
 `driver` defaults to `prusalink`, and `prusalink_url` is still read in
 place of `url`, so stations set up before there was a choice need no
 change. `profile` is any name you like: it picks the G-code from the
@@ -116,6 +124,50 @@ while it is running.
   prints, finishes, clears and cancels on it for real, and runs the
   farm loop through two beds. `-p 1` because both share the one printer.
   Without those variables the live tests are skipped.
+
+### Bambu Lab
+
+The daemon talks to Bambu printers the way Bambu Studio does on a LAN:
+status from the printer's own MQTT broker (TLS, port 8883), files over
+FTPS (port 990), prints started with an MQTT command. No cloud account,
+no Bambu Connect, no SDK.
+
+- **Developer Mode is required to print.** Bambu's firmware now refuses
+  to start a print over the LAN from anything but its own software
+  unless the printer is in *LAN Only* mode with *Developer Mode* on
+  (see Bambu's [third-party integration](https://wiki.bambulab.com/en/software/third-party-integration)
+  page). Status is still pushed without it, so a printer that isn't in
+  Developer Mode shows up and is mirrored, but its prints fail to start
+  and come back as an upload task.
+- **What it costs.** Developer Mode keeps the printer off Bambu Cloud:
+  no Bambu Handy, no cloud printing, no remote view from Bambu's apps.
+  Bambu Studio and OrcaSlicer still work on the LAN. Anyone on that
+  network with the access code has full control, so put the printers
+  on their own VLAN or subnet next to the Pi.
+- **The key** is the *access code* on the printer's screen (*Settings →
+  LAN Only*), as `PRINTER_KEY_<CODE>`. It changes if LAN mode is toggled.
+- **`serial`** is the printer's serial number (*Settings → Device*, or
+  the label). It names the printer's MQTT topics, so it is required.
+- **Files** are sliced `.gcode.3mf` from Bambu Studio or OrcaSlicer
+  (*Export plate sliced file*), named under the Bambu printer's profile:
+  `{"gcode": {"p2s-0.4": "bracket_PETG_P2S.gcode.3mf"}}`. The sidecar
+  is `bracket_PETG_P2S.json` beside it. They go to the printer's storage
+  (an SD card on most models) under the same name, replacing any file
+  of that name.
+- **`bambu` options**, all optional: `plate` (default 1), `use_ams` and
+  `ams_mapping` (the file's filaments to AMS slots, in order; without
+  `use_ams` the external spool feeds), `bed_levelling` (default true),
+  `timelapse`, and `storage` — the URL prefix the printer opens uploads
+  under, `file:///sdcard/` by default.
+- **Checking a printer** without the MRP, read-only:
+
+  ```sh
+  BAMBU_CODE=12345678 print-manager printer -driver bambu -url 192.168.1.120 \
+      -serial 01P00A000000001 -key-env BAMBU_CODE status
+  ```
+
+  This proves the address, serial and access code. It cannot prove
+  Developer Mode: only starting a print does.
 
 A printed part's G-code is named in **its** custom data, by profile:
 `{"gcode": {"core-one-0.4": "bow_node-case_PP_COREONE.bgcode"}}` — a bare
